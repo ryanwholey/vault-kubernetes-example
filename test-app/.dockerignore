@@ -1,0 +1,6 @@
+*
+.*
+!app
+!knexfile.js
+!package-lock.json
+!package.json

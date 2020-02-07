@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
 : '
-./01-vault-server.sh
+./01-vault-server.sh \
+  "vault" \
+  "http://$(minikube ip):8443"
 '
 
-cat <<EOF | kubectl apply -f -
+VAULT_SERVER_NAMESPACE="$1"
+KUBERNETES_API_URL="$2"
+
+kubectl create namespace "$VAULT_SERVER_NAMESPACE"
+
+cat <<EOF | kubectl apply -n $VAULT_SERVER_NAMESPACE -f -
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -41,10 +48,10 @@ spec:
     protocol: TCP
   selector:
     run: vault
-  type: "NodePort"
+  type: NodePort
 EOF
 
-until nc -z $(minikube ip) $(kubectl get service vault -o jsonpath={.spec.ports[0].nodePort}) ; do echo 'setting up Vault..' && sleep 3 ; done
-export VAULT_ADDR="http://$(minikube ip):$(kubectl get service vault -o jsonpath={.spec.ports[0].nodePort})"
+until nc -z $(minikube ip) $(kubectl get service vault -n $VAULT_SERVER_NAMESPACE -o jsonpath={.spec.ports[0].nodePort}) ; do echo 'setting up Vault..' && sleep 3 ; done
+export VAULT_ADDR="http://$(minikube ip):$(kubectl get service vault -n $VAULT_SERVER_NAMESPACE -o jsonpath={.spec.ports[0].nodePort})"
 
 vault auth enable kubernetes

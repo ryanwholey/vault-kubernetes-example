@@ -1,0 +1,28 @@
+{
+    "name": "@scoop/test-app",
+    "version": "0.0.1",
+    "private": true,
+    "author": {
+        "name": "Scoop Technologies Inc",
+        "email": "ops@takescoop.com",
+        "url": "https://www.takescoop.com/"
+    },
+    "scripts": {
+        "knexd": "NODE_ENV=development knex",
+        "knext": "NODE_ENV=test knex",
+        "services:up": "docker-compose up -d --build",
+        "services:down": "docker-compose down",
+        "start": "NODE_ENV=development ENV_FILE=.env node app/server.js && onchange app/**.js -- node app/server.js"
+    },
+    "dependencies": {
+        "boom": "^7.3.0",
+        "dotenv": "^8.2.0",
+        "hapi": "^18.1.0",
+        "hapi-router": "^5.0.0",
+        "joi": "^14.3.1",
+        "knex": "^0.20.8",
+        "lodash": "^4.17.15",
+        "pg": "^7.18.1"
+    },
+    "devDependencies": {}
+}
