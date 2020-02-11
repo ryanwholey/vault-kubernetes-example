@@ -9,14 +9,22 @@
 
 export VAULT_ADDR="$1"
 APP_NAME="$2"
+DB_NAME="${2}-db"
 NAMESPACE="$3"
 DB_HOSTNAME="${APP_NAME}-db.${NAMESPACE}.svc.cluster.local"
+POSTGRES_DB="test_db"
 
 kubectl create namespace "$NAMESPACE"
 
-vault policy write "${APP_NAME}-kv-ro" <(cat <<EOF
-path "secret/data/${APP_NAME}/*" {
-    capabilities = ["read", "list"]
+vault policy write "${APP_NAME}-ro" <(cat <<EOF
+path "database/creds/${APP_NAME}" {
+  capabilities = ["read"]
+}
+path "sys/leases/renew" {
+  capabilities = ["create"]
+}
+path "sys/leases/revoke" {
+  capabilities = ["update"]
 }
 EOF
 )
@@ -24,13 +32,15 @@ EOF
 vault write "auth/kubernetes/role/${APP_NAME}" \
   "bound_service_account_names=${APP_NAME}" \
   "bound_service_account_namespaces=${NAMESPACE}" \
-  "policies=${APP_NAME}-kv-ro" \
-  ttl=24h
+  "policies=${APP_NAME}-ro" \
+  ttl="0"
 
-vault kv put "secret/${APP_NAME}/config" \
-  username="app" \
-  password="secret" \
-  ttl="30s"
+vault write "database/roles/${APP_NAME}" \
+  db_name=${DB_NAME} \
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+  default_ttl="5m" \
+  max_ttl="10m"
 
 cat <<EOF | kubectl apply -n ${NAMESPACE} -f -
 ---
@@ -56,11 +66,11 @@ spec:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/agent-inject-status: "update"
         vault.hashicorp.com/role: "${APP_NAME}"
-        vault.hashicorp.com/agent-inject-secret-foo: "secret/${APP_NAME}/config"
-        vault.hashicorp.com/agent-inject-template-foo: |
-          {{- with secret "secret/${APP_NAME}/config" -}}
-          PG_CONNECTION_STRING=postgres://{{ .Data.data.username }}:{{ .Data.data.password }}@${DB_HOSTNAME}:5432/test_db
-          {{- end -}}
+        vault.hashicorp.com/agent-inject-secret-db: 'database/roles/${APP_NAME}'
+        vault.hashicorp.com/agent-inject-template-db: |
+          {{- with secret "database/creds/${APP_NAME}" -}}
+          PG_CONNECTION_STRING=postgres://{{ .Data.username }}:{{ .Data.password }}@${DB_HOSTNAME}:5432/${POSTGRES_DB}
+          {{- end }}
       labels:
         app: ${APP_NAME} 
     spec:
@@ -75,11 +85,29 @@ spec:
         - name: PORT
           value: "3000"
         - name: ENV_FILE
-          value: /vault/secrets/foo
+          value: /vault/secrets/db
         - name: POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /system/health/alive
+            port: 3000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /system/health/ready
+            port: 3000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
       serviceAccountName: ${APP_NAME}
 ---
 apiVersion: v1

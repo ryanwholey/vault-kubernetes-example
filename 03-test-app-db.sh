@@ -8,6 +8,8 @@
 
 DB_NAME="${1}-db"
 NAMESPACE="$2"
+POSTGRES_USER="app"
+POSTGRES_PASSWORD="secret"
 
 kubectl create namespace "$NAMESPACE"
 
@@ -47,10 +49,12 @@ spec:
         image: postgres:12.1
         env:
         - name: POSTGRES_USER
-          value: app
+          value: $POSTGRES_USER
         - name: POSTGRES_PASSWORD
-          value: secret
+          value: $POSTGRES_PASSWORD
         - name: POSTGRES_DB
           value: test_db
 EOF
 
+echo "host: $(minikube ip)"
+echo "port: $(kubectl get service ${DB_NAME} -n ${NAMESPACE} -o jsonpath={.spec.ports[0].nodePort})"
