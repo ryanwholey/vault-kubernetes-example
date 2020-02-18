@@ -39,8 +39,8 @@ vault write "database/roles/${APP_NAME}" \
   db_name=${DB_NAME} \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="5m" \
-  max_ttl="10m"
+  default_ttl="2m" \
+  max_ttl="4m"
 
 cat <<EOF | kubectl apply -n ${NAMESPACE} -f -
 ---

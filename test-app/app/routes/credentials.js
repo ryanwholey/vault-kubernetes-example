@@ -3,6 +3,7 @@
 const knex = require('../lib/knex')
 const config = require('../config')
 const _ = require('lodash')
+const parseDbCredentials = require('../lib/parseDbCredentials')
 
 module.exports = {
   method: 'GET',
@@ -14,19 +15,22 @@ module.exports = {
     try {
       version = await knex.select(knex.raw('VERSION()'))
     } catch (err) {
-    
+      console.log(err)
     }
+
     const status = version ? 'OK' : 'FAILURE'
-    console.log(`${new Date().toISOString()}: ${request.url}: ${status}`)
-    const { username, password } = new URL(config.pgConnectionString)
-    console.log(`\t user: ${username}`)
-    console.log(`\t pass: ${password}`)
-    console.log(`\t pod: ${process.env.POD_NAME}`)
-  
-    return {
+    const { username, password } = await parseDbCredentials()
+
+    const response =  {
       ..._.pick(knex.client.config.connection, ['user', 'password']),
+      fileUsername: username,
+      filePassword: password,
+      knexUsername: knex.client.connectionSettings.user,
+      knexPass: knex.client.connectionSettings.password,
       status,
       podName: config.podName
     }
+    // console.log(response)
+    return response
   }
 }

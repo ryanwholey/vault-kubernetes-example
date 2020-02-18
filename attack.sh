@@ -5,6 +5,5 @@ TEST_APP_URL="http://$(minikube ip):$(kubectl get service test-app -n apps -o js
 while true ;
 do
     curl -fsS "${TEST_APP_URL}/credentials" | jq
-    sleep 1
 done
 
